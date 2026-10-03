@@ -26,6 +26,12 @@ namespace TF.MasterData
         public int Damage { get; private set; }
 
         /// <summary>
+        /// 回復する値
+        /// </summary>
+        [field: SerializeField]
+        public int Recovery { get; private set; }
+
+        /// <summary>
         /// 行動時に消費するエネルギー
         /// </summary>
         [field: SerializeField]

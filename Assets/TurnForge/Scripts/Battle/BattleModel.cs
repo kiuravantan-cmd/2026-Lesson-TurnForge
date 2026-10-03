@@ -65,6 +65,20 @@ namespace TF.Battle
             // その後ActionResolvedを通知する。失敗時は状態を置き換えず、通知もしない。
             // 現在状態を更新した後にActionResolvedで結果を通知する。
             // 実行できない指示では現在状態を変更しない。
+            if (request == null || _rules == null || _currentState == null)
+            {
+                return false;
+            }
+
+            if (!_rules.TryExecute(_currentState, request, out result))
+            {
+                return false;
+            }
+
+            _currentState = result.NextState;
+            ActionResolved?.Invoke(result);
+            return true;
+
             // TODO LESSON04-01: R3による状態通知へ移行し、購読の所有者と寿命を決める。
             // 第4回・1〜2コマ目: 現在状態の通知元をR3で用意し、成功時にNextStateを通知する。
             // 変更前の状態を保持する設計は維持し、購読側から状態を直接変更させない。

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TF.Battle.Commands;
 using TF.Battle.Models;
 using TF.MasterData;
+using UnityEngine;
 
 namespace TF.Battle.Rules
 {
@@ -87,6 +88,42 @@ namespace TF.Battle.Rules
             // 第1回・2コマ目: resultをnullにし、CanExecuteで状態・指示・技のマスタを確認する。
             // 通常攻撃は相手のHPを減らし、HP0なら終了。続く場合だけ番を交代し、番号を1増やす。
             // First/Secondの配置を保ち、変更前と変更後をBattleResultへまとめる。
+            if (!CanExecute(currentState, request, out var battleCommand))
+            {
+                return false;
+            }
+
+            CombatantState actor = GetCombatant(currentState, request.Actor);
+            CombatantState target = GetCombatant(
+                currentState, GetOpponentSide(request.Actor));
+
+            CombatantState nextTarget = ApplyDamage(target, battleCommand.Damage, 1);
+
+            bool isFinished = nextTarget.IsDefeated;
+
+            int nextTurnNumber = currentState.TurnNumber;
+            BattleSide nextActionSide = currentState.ActionSide;
+            if (!isFinished)
+            {
+                if (nextTurnNumber >= int.MaxValue)
+                {
+                    return false;
+                }
+
+                nextActionSide = target.Side;
+                nextTurnNumber++;
+            }
+
+            CombatantState nextFirst =
+                request.Actor == BattleSide.First ? actor : nextTarget;
+            CombatantState nextSecond =
+                request.Actor == BattleSide.Second ? actor : nextTarget;
+
+            BattleState nextState = new BattleState(
+                nextFirst, nextSecond, nextActionSide, nextTurnNumber, isFinished);
+
+            result = new BattleResult(request, currentState, nextState);
+            return true;
             // TODO LESSON01-06B: 第1回・3コマ目で回復の分岐を追加し、自分の回復後の状態を組み込む。
             // 回復でもターン交代と結果作成は共通にし、変更前の状態は書き換えない。
             // 通常攻撃のマスタ値とApplyDamageを使って、攻撃後の状態を作る。
@@ -114,6 +151,47 @@ namespace TF.Battle.Rules
             // 第1回・1コマ目: null、終了、キャラクターのHPなど、陣営、ターン番号を順に確認する。
             // 指示のActorとActionSide、指示のTurnNumberと現在番号が一致すること。
             // 通常攻撃のマスタを取得してoutへ渡し、無効な指示では状態を変えずfalseを返す。
+            if (state == null || request == null)
+            {
+                return false;
+            }
+
+            if (!IsConfigured)
+            {
+                return false;
+            }
+
+            if (state.IsFinished || state.TurnNumber < 1)
+            {
+                return false;
+            }
+
+            if (!IsValidCombatant(state.FirstCombatant, BattleSide.First) ||
+                !IsValidCombatant(state.SecondCombatant, BattleSide.Second))
+            {
+                return false;
+            }
+
+            if (state.ActionSide != BattleSide.First &&
+                state.ActionSide != BattleSide.Second)
+            {
+                return false;
+            }
+
+            // 回復の条件入れる
+            if (request.Command != BattleCommand.Attack)
+            {
+                return false;
+            }
+
+            if (state.ActionSide != request.Actor ||
+                state.TurnNumber != request.TurnNumber)
+            {
+                return false;
+            }
+
+            return _commandData.TryGetValue(request.Command, out commandData);
+
             // TODO LESSON01-06C: 第1回・3コマ目で回復も受け付けるよう、技の判定を広げる。
             // _commandDataから指示されたコマンドのマスタを取得する。
             // 前半はAttackだけ許可し、第3コマの課題で回復を追加する。防御・チャージ・必殺技は第6回。
@@ -167,6 +245,9 @@ namespace TF.Battle.Rules
             // 第1回・1コマ目: Math.MaxでHPを0以上にし、CopyCombatantへ計算後のHPを渡す。
             // エネルギー・防御状態・Side・最大値は引き継ぐ。
             // CopyCombatantでHP以外を引き継いだ新しい状態を返す。
+            int nextHP = Mathf.Max(0, target.Hp - damage);
+            return CopyCombatant(target, nextHP, target.Energy, target.IsGuarding);
+
             // TODO LESSON06-03: 防御中はguardDamageDivisorで整数除算してから適用する。
             // 第6回・1コマ目: 防御中だけdamageを除数で割り、端数を切り捨ててからHPへ適用する。
             return target;
@@ -179,6 +260,9 @@ namespace TF.Battle.Rules
         {
             // TODO LESSON01-01A: sourceのSide・MaxHp・MaxEnergyを引き継ぐ。
             // 第1回・1コマ目: 引数のhp・energy・isGuardingで新しいCombatantStateを作る。
+            return new CombatantState(source.Side,
+                hp, source.MaxHp, energy, source.MaxEnergy, isGuarding);
+
             // TODO LESSON01-06A: 第1回・3コマ目で回復用メソッドをこのクラスへ追加する。
             // 自分の状態とマスタの回復量を受け取り、MaxHpを超えないHPでCopyCombatantする。
             // hp・energy・isGuardingは引数の値を使い、新しいCombatantStateを返す。

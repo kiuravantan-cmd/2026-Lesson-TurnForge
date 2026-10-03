@@ -16,6 +16,24 @@ namespace TF.Battle.AI
             command = default;
             // TODO LESSON01-05: 継続中かつ指定した側の番なら通常攻撃を選ぶ。
             // 第1回・2コマ目: 状態あり・継続中・有効な陣営・自分の番ならAttackを返す。
+            if (state == null || state.IsFinished)
+            {
+                return false;
+            }
+
+            if (state.ActionSide != actor) {
+                return false;
+            }
+
+            if (actor != BattleSide.First &&
+                actor != BattleSide.Second)
+            {
+                return false;
+            }
+
+            command = BattleCommand.Attack;
+            return true;
+
             // TODO LESSON01-07: 第1回・4コマ目でactor側のHPを読み、半分以下なら回復を選ぶ。
             // HPが半分より多ければAttack。HP計算や番の交代はRulesに任せる。
             // TODO LESSON05-01: このインターフェースを使う別のCPU判断を追加し、DIで差し替える。

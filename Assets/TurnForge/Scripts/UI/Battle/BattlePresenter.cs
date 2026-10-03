@@ -125,6 +125,7 @@ namespace TF.UI.Battle
             // 第2回・1コマ目: Model.CanExecute(_inputSide, command)で使える技かを調べる。
             // 使用可能なら_selectedCommandへ覚え、SetSelectedCommandとRefreshInputへ反映する。
             // 選んだだけでは戦闘を実行しない。
+
         }
 
         /// <summary>

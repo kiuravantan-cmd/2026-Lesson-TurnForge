@@ -1,5 +1,6 @@
-Id,Command,Damage,EnergyCost,EnergyGain,GuardDamageDivisor
-1,0,20,0,0,1
-2,1,0,0,0,2
-3,2,0,0,1,1
-4,3,40,2,0,1
+Id,Command,Damage,Recovery,EnergyCost,EnergyGain,GuardDamageDivisor
+1,0,20,0,0,0,1
+2,1,0,0,0,0,2
+3,2,0,,00,1,1
+4,3,40,0,2,0,1
+5,4,0,10,0,0,1
