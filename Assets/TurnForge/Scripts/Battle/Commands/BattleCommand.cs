@@ -25,6 +25,9 @@
         /// </summary>
         Special,
 
+        /// <summary>
+        /// 回復を行う
+        /// </summary>
         Heal,
     }
 }
