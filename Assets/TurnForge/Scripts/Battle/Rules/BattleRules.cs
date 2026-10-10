@@ -124,9 +124,9 @@ namespace TF.Battle.Rules
             }
 
             CombatantState nextFirst =
-                request.Actor == BattleSide.First ? actor : nextTarget;
+                request.Actor == BattleSide.First ? nextActor : nextTarget;
             CombatantState nextSecond =
-                request.Actor == BattleSide.Second ? actor : nextTarget;
+                request.Actor == BattleSide.Second ? nextActor : nextTarget;
 
             BattleState nextState = new BattleState(
                 nextFirst, nextSecond, nextActionSide, nextTurnNumber, isFinished);
@@ -178,7 +178,7 @@ namespace TF.Battle.Rules
                 return false;
             }
 
-            if (request.Command != BattleCommand.Attack ||
+            if (request.Command != BattleCommand.Attack &&
                 request.Command != BattleCommand.Heal)
             {
                 return false;
