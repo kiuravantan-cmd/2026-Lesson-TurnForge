@@ -1,3 +1,8 @@
+using System;
+using System.IO;
+using System.Security;
+using UnityEngine;
+
 namespace TF.Infrastructure.Saving
 {
     /// <summary>
@@ -18,17 +23,95 @@ namespace TF.Infrastructure.Saving
             _directoryPath = directoryPath;
         }
 
+        private string GetFilePath(string key)
+        {
+            return Path.Combine(_directoryPath, $"save_{key}.json");
+        }
+
+        private bool IsValidKey(string key)
+        {
+            if (string.IsNullOrEmpty(key) || key.Length > 64)
+            {
+                return false;
+            }
+
+            foreach(char character in key)
+            {
+                bool isAllowed =
+                    (character >= 'a' && character <= 'z')      // 英語（小文字）a～z
+                    || (character >= 'A' && character <= 'Z')   // 英語（大文字）A～Z
+                    || (character >= '0' && character <= '9')   // 数字 0～9
+                    || character == '-'                         // -（ハイフン）
+                    || character == '_';                        // _（アンダーバー）
+
+                if (!isAllowed)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsStorageException(Exception exception)
+        {
+            return exception is IOException
+                || exception is UnauthorizedAccessException
+                || exception is SecurityException
+                || exception is ArgumentException
+                || exception is NotSupportedException;
+        }
+
+        private static void DeleteTemporaryFile(string path) {
+            if (string.IsNullOrEmpty(path)) {
+                return;
+            }
+
+            try {
+                File.Delete(path);
+            }
+            catch (Exception exception) when(IsStorageException(exception))
+            {
+                Debug.LogWarning($"一時ファイルを削除できませんでした。:{exception.Message}");
+            }
+        }
+
         /// <summary>
         /// 指定したキーでデータを保存する。配布時は書き込まない。
         /// </summary>
         public bool TrySave<T>(string key, T data) where T : class
         {
-            // TODO LESSON03-01: キーと入力を確認し、JSONに変換して保存する。
-            // 第3回・1〜2コマ目: キーを英数字・ハイフン・アンダースコアに限定して保存先を作る。
-            // JSONを一時ファイルへ書き、書き込み成功後に保存先へ反映する。
-            // ファイルI/Oの境界でtry/catchし、失敗はfalseで返して既存データを保護する。
-            // 一時ファイルからの反映、I/O失敗時の扱いと後始末を実装する。
-            return false;
+            if (data == null || string.IsNullOrWhiteSpace(_directoryPath) || !IsValidKey(key)) {
+                return false;
+            }
+
+            // 書き込み途中のファイルを既存データから分離する
+            string tmpPath = null;
+
+            try {
+                string json = JsonUtility.ToJson(data, true);
+
+                Directory.CreateDirectory(_directoryPath);
+
+                string filePath = GetFilePath(key);
+
+                tmpPath = $"{filePath}.{Guid.NewGuid().ToString("N")}.tmp";
+
+                File.WriteAllText(tmpPath, json);
+                if (File.Exists(filePath)) {
+                    File.Replace(tmpPath, filePath, null);
+                } else {
+                    File.Move(tmpPath, filePath);
+                }
+
+                return true;
+            } catch (Exception exception) when (IsStorageException(exception)) {
+                Debug.LogWarning($"セーブに失敗しました。:{exception.Message}");
+                return false;
+            }
+            finally {
+                DeleteTemporaryFile(tmpPath);
+            }
         }
 
         /// <summary>
@@ -38,11 +121,39 @@ namespace TF.Infrastructure.Saving
         {
             data = null;
             status = SaveLoadStatus.Failed;
-            // TODO LESSON03-02: JSONを読み込み、成功・未保存・失敗を区別する。
-            // 第3回・2コマ目: ファイルなしはNotFound、読み込み・変換の失敗はFailedに分ける。
-            // 読み込み成功時だけdataを返す。破損を初回扱いにして上書きしない。
-            // 未実装をNotFoundとして返さない。既存データの上書きを防ぐ。
-            return false;
+
+            if (!IsValidKey(key) || string.IsNullOrWhiteSpace(_directoryPath)) {
+                return false;
+            }
+
+            try {
+                string filePath = GetFilePath(key);
+                string json = File.ReadAllText(filePath);
+                if (string.IsNullOrEmpty(json)) {
+                    return false;
+                }
+
+                data = JsonUtility.FromJson<T>(json);
+                if (data == null) {
+                    return false;
+                }
+
+                status = SaveLoadStatus.Success;
+                return true;
+            }
+            catch (DirectoryNotFoundException) {
+                status = SaveLoadStatus.NotFound;
+                return false;
+            }
+            catch (FileNotFoundException) {
+                status = SaveLoadStatus.NotFound;
+                return false;
+            }
+            catch (Exception exception) when (IsStorageException(exception)) {
+                Debug.LogWarning($"セーブの読み込みに失敗しました。key:{key} message:{exception.Message}");
+                data = null;
+                return false;
+            }
         }
     }
 }

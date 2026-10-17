@@ -152,6 +152,10 @@ namespace TF.Composition
         /// </summary>
         private BattleRecordService _battleRecordService;
 
+        private BattleSessionService _battleSessionService;
+        private ulong _activeFirstCombatantId;
+        private ulong _activeSecondCombatantId;
+
         /// <summary>
         /// 現在のゲーム全体の状態
         /// </summary>
@@ -326,10 +330,10 @@ namespace TF.Composition
                 return;
             }
 
-            // TODO LESSON03-07: セーブ機能完成後、読み込みと失敗時の扱いを接続する。
-            // 第3回・2コマ目: 読み込み完了後に新規開始・再開・失敗時の案内を切り替える。
-            // 未保存と破損を区別し、破損データは保護したうえで新規開始を選べるようにする。
-            // 配布時は保存を呼び出さず、タイトルへ進める。
+            if (!TryInitializeBattleSession()) {
+                _gameFlow.TryFailStartup();
+                return;
+            }
 
             // マスタ読み込みと戦闘作成の結果
             bool succeeded = await LoadMasterDataAsync();
@@ -407,16 +411,24 @@ namespace TF.Composition
             {
                 return false;
             }
+
+            bool shouldResume = _battleSessionService != null && _battleSessionService.HasResumeData;
+            ulong firstId = shouldResume
+                ? _battleSessionService.CurrentData.FirstCombatantId
+                : _firstCombatantId;
+            ulong secondId = shouldResume
+                ? _battleSessionService.CurrentData.SecondCombatantId
+                : _secondCombatantId;
             
-            if (!accessor.TryGetById(_firstCombatantId, out BattleCombatantDataRecord firstCombatant))
+            if (!accessor.TryGetById(firstId, out BattleCombatantDataRecord firstCombatant))
             {
-                Debug.LogError($"参加者マスタがありません：ID {_firstCombatantId}", this);
+                Debug.LogError($"参加者マスタがありません：ID {firstId}", this);
                 return false;
             }
 
-            if (!accessor.TryGetById(_secondCombatantId, out BattleCombatantDataRecord secondCombatant))
+            if (!accessor.TryGetById(secondId, out BattleCombatantDataRecord secondCombatant))
             {
-                Debug.LogError($"参加者マスタがありません：ID {_secondCombatantId}", this);
+                Debug.LogError($"参加者マスタがありません：ID {secondId}", this);
                 return false;
             }
             
@@ -427,6 +439,15 @@ namespace TF.Composition
                 Debug.LogError("参加者マスタの初期能力が不正です。", this);
                 return false;
             }
+
+            if (shouldResume && !_battleSessionService.TryRestore(initialState, firstId, secondId, out initialState))
+            {
+                Debug.LogError($"途中のバトルを復元できませんでした。保存データは上書きしません。");
+                return false;
+            }
+
+            _activeFirstCombatantId = firstId;
+            _activeSecondCombatantId = secondId;
 
             // コマンドマスタを使用する戦闘ルール
             var rules = new BattleRules(accessor.GetAll<BattleCommandDataRecord>());
@@ -450,6 +471,7 @@ namespace TF.Composition
             // オフラインではFirstをプレイヤーの操作側にする
             _battlePresenter = new BattlePresenter(_battleView, _battleModel, _battleFlow, BattleSide.First);
             _battlePresenter.BattleFinished += HandleBattleFinised;
+            _battlePresenter.PlayerTurnReady += HandlePlayerTurnReady;
 
             if (!_battlePresenter.TryInitialize())
             {
@@ -541,6 +563,8 @@ namespace TF.Composition
                 return false;
             }
 
+            HandlePlayerTurnReady(_battleModel.CurrentState);
+
             // 戦闘画面への遷移後に、CPUの行動を許可する
             _battleCpu.SetEnabled(true);
 
@@ -588,6 +612,7 @@ namespace TF.Composition
             if (_battlePresenter != null)
             {
                 _battlePresenter.BattleFinished -= HandleBattleFinised;
+                _battlePresenter.PlayerTurnReady -= HandlePlayerTurnReady;
                 _battlePresenter.Dispose();
                 _battlePresenter = null;
             }
@@ -740,6 +765,58 @@ namespace TF.Composition
             // TODO LESSON03-10: 終了時の未保存データの再保存を接続する。
             // 第3回・2コマ目: 終了前に未保存の変更を保存する。終了時だけの保存に頼らない。
             Release();
+        }
+
+        private bool TryInitializeBattleSession() {
+            string dirPath = Path.Combine(Application.persistentDataPath, "Save");
+            ISaveStorage storage = new JsonFileSaveStorage(dirPath);
+            _battleSessionService = new BattleSessionService(storage);
+            if (!_battleSessionService.TryLoad()) {
+                Debug.LogError("途中のバトルを読み込めませんでした。");
+                return false;
+            }
+
+            Debug.Log(_battleSessionService.HasResumeData
+                ? "途中のバトルがあります。"
+                : "新しいバトルで開始します。");
+            return true;
+        }
+
+        private void SaveBattleSessionIfNeeded()
+        {
+            if (_battleSessionService == null || !_battleSessionService.HasUnsavedChanges) {
+                return;
+            }
+
+            if (_battleSessionService.TrySave()) {
+                Debug.LogWarning("途中のバトルを保存できませんでした。");
+            }
+        }
+
+        private void HandlePlayerTurnReady(BattleState state) {
+            if (_isReleased || CurrentState != GameState.Battle) {
+                return;
+            }
+
+            if (_battleSessionService == null) {
+                return;
+            }
+
+            if (_battleFlow == null || !_battleFlow.CanAcceptInput) {
+                return;
+            }
+
+            if (state == null || state.IsFinished || state.ActionSide != BattleSide.First) {
+                return;
+            }
+
+            if (!ReferenceEquals(state, _battleModel?.CurrentState)) {
+                return;
+            }
+
+            if (_battleSessionService.TryCapture(state, _activeFirstCombatantId, _activeSecondCombatantId)) {
+                SaveBattleSessionIfNeeded();
+            }
         }
     }   
 }

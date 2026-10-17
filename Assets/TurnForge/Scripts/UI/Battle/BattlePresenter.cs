@@ -67,6 +67,8 @@ namespace TF.UI.Battle
         /// </summary>
         public event UnityAction<BattleState> BattleFinished;
 
+        public event UnityAction<BattleState> PlayerTurnReady;
+
         /// <summary>
         /// プレイヤーからの操作を受け付けられるか
         /// </summary>
@@ -225,6 +227,10 @@ namespace TF.UI.Battle
             {
                 BattleFinished?.Invoke(_model.CurrentState);
             }
+            else if (CanAcceptPlayerInput)
+            {
+                PlayerTurnReady?.Invoke(_model.CurrentState);
+            }
 
             // falseでも、成立済みの行動は巻き戻さない
             return !canceled;
@@ -290,6 +296,7 @@ namespace TF.UI.Battle
             }
 
             BattleFinished = null;
+            PlayerTurnReady = null;
         }
     }
 }
