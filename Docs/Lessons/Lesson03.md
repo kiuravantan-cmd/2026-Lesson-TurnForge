@@ -235,7 +235,7 @@ Windowsでは日本語のファイル名自体を使える場合もあります�
 今回ライブコーディングで開くファイルは次の4つです。UnityのProjectウィンドウではAssetsからたどります。
 
 * Assets/TurnForge/Scripts/Infrastructure/Saving/JsonFileSaveStorage.cs：保存・読み込みと補助関数を実装する。
-* Assets/TurnForge/Scripts/Battle/Saving/BattleSessionService.cs：TryCapture・TrySave・TryRestoreを実装する。
+* Assets/TurnForge/Scripts/Battle/Saving/BattleSessionService.cs：TryLoad・TryRestore・TryCapture・TrySaveを実装する。
 * Assets/TurnForge/Scripts/UI/Battle/BattlePresenter.cs：PlayerTurnReadyの宣言・通知・解除を追加する。
 * Assets/TurnForge/Scripts/Composition/GameCompositionRoot.cs：通知の受け取りと保存処理への接続を追加する。
 
@@ -603,7 +603,80 @@ catchは上から当てはまるものを使います。FileNotFoundExceptionと
 
 この関数はファイルを読むだけで、HPを直接画面へ表示したりBattleModelを作ったりしません。Serviceが保存データを持ち、TryRestoreとRootの組み立てを通して、いつものバトルへ戻します。
 
-この後Service.TryRestoreとRootの接続を実装します。TryLoadが使える状態になってからRoot.InitializeGameAsyncへつなぐので、読み込みが常に失敗してタイトルへ進めなくなる未実装の状態を避けられます。
+### ライブコーディング：BattleSessionService.TryLoad
+
+Storageの読み込みに続いて、Service側のTryLoadも実装します。JsonFileSaveStorage.TryLoad<T>は「ファイルを読んでデータを取り出す」、BattleSessionService.TryLoadは「その結果を初回・失敗に分け、使えるデータだけ保持する」という役割です。
+
+#### 書く場所
+
+* ファイル：Assets/TurnForge/Scripts/Battle/Saving/BattleSessionService.cs。
+* 作業：既存のTryLoad()の宣言から最後の}までを、下のコードへ置き換える。Storage側のTryLoad<T>は変更しない。
+* 位置：BattleSessionService(ISaveStorage storage)のコンストラクターの閉じる}の下、TryRestoreのすぐ上。枠がない場合もこの位置へ追加する。クラス内に同じTryLoadを2つ作らない。
+* ファイル先頭のusing TF.Infrastructure.Saving;でISaveStorageとSaveLoadStatusを使う。既にある場合は追加しない。
+
+#### この関数で使うもの
+
+* _storage：ファイルの読み書きを頼む相手。コンストラクターで受け取る。
+* SaveKey：このバトルの保存データを識別する"battle_session"という既存の定数。
+* HasUnsavedChanges：まだ保存していない変更があるか。trueの間に読み直すと変更を失うため、読み込みを断る。
+* IsInitialized：起動時の読み込み判断が終わったか。ファイルがない初回も、正常に判断できたのでtrueになる。
+* data：Storageから受け取るBattleSessionSaveData。out varは、呼び出し先から受け取る変数をその場で宣言する書き方。
+* status：Storageから受け取るSaveLoadStatus。NotFoundだけを、保存ファイルがまだない初回として扱う。
+* IsValidData：このServiceの末尾にある既存の確認関数。保存形式の番号、ID、HPやエネルギー、ターン、保存できる区切りかを調べる。ここでは呼び出し、確認処理を重ねて作らない。
+* CurrentData：使えると判断した保存データを保持する。BattleStateへの復元は、この後のTryRestoreが担当する。
+
+```csharp
+/// <summary>
+/// 初回と失敗を分け、保存データを読み込む。
+/// </summary>
+public bool TryLoad()
+{
+    if (_storage == null || HasUnsavedChanges)
+    {
+        return false;
+    }
+
+    if (IsInitialized)
+    {
+        return true;
+    }
+
+    if (!_storage.TryLoad<BattleSessionSaveData>(SaveKey, out var data, out var status))
+    {
+        if (status != SaveLoadStatus.NotFound)
+        {
+            return false;
+        }
+
+        // 初回は途中のバトルを持たず、新規開始する。
+        IsInitialized = true;
+        return true;
+    }
+
+    if (!IsValidData(data))
+    {
+        return false;
+    }
+
+    CurrentData = data;
+    IsInitialized = true;
+    return true;
+}
+```
+
+#### 実行される順に読む
+
+* 保存先がない、または未保存の変更がある場合はfalse。現在のデータを読み込みで置き換えない。
+* 既に初期化済みならtrue。ファイルの読み直しは行わない。このTryLoadはゲーム中に何度もロードするための関数ではない。
+* StorageへBattleSessionSaveDataの読み込みを頼む。!は「成功しなかった場合に、この中へ進む」という意味。
+* Storageがfalseを返し、statusがNotFoundなら初回としてIsInitializedをtrueにする。CurrentDataはnullのままなので、途中のバトルはない。ファイルがないことをゲーム起動の失敗にはしない。
+* NotFound以外の読み込み失敗はfalse。失敗を初回として扱って、読めなかった保存データを上書きする進め方にはしない。
+* StorageがtrueでもIsValidDataがfalseなら採用しない。JSONをデータへ戻せたことと、ゲームで使える値であることは別。
+* 正常なデータだけCurrentDataへ入れ、IsInitializedをtrueにして成功を返す。読み込んだだけなのでHasUnsavedChangesはtrueにしない。
+
+ファイルがない初回では「true・IsInitializedはtrue・CurrentDataはnull」、正常な保存があれば「true・IsInitializedはtrue・CurrentDataに保存データ」、読み込み失敗や値の不正では、初期化前の呼び出しは「false・IsInitializedはfalse」です。RootのTryInitializeBattleSessionはfalseを受け取ると起動を中止するので、失敗したデータをそのまま新しいバトルとして保存しません。
+
+この後TryRestoreとRootの接続を実装します。StorageとServiceの両方のTryLoadを完成させてから、Root.InitializeGameAsyncへつなぎます。
 
 ### TryRestoreで使う値と関数
 
@@ -953,7 +1026,7 @@ if (_battleSessionService != null
 
 ### 3コマ目の最後：保存して、再起動後に続きへ戻る
 
-ここまでのライブコーディングで、Serviceの3つの関数、Rootの読み込み・復元・保存、Presenterの通知とRootへの接続を実装できています。3コマ目の終わりに、次の流れを授業中に一緒に試します。
+ここまでのライブコーディングで、Serviceの4つの関数、Rootの読み込み・復元・保存、Presenterの通知とRootへの接続を実装できています。3コマ目の終わりに、次の流れを授業中に一緒に試します。
 
 * バトルを進め、相手の演出が終わって自分のコマンドを選べる状態にする。
 * 双方のHP・エネルギー・防御状態とターン番号を覚えて、ゲームを終了する。Unity EditorではPlayモードを止める。
@@ -1524,3 +1597,5 @@ OnDestroyは、このオブジェクトが破棄されるときにUnityが呼ぶ
 * [Unity：Application.persistentDataPath](https://docs.unity3d.com/6000.3/Documentation/ScriptReference/Application-persistentDataPath.html)
 * [Steamworks：Steam Cloud](https://partner.steamgames.com/doc/features/cloud)
 * [Microsoft：XGameSave](https://learn.microsoft.com/en-us/gaming/gdk/docs/features/common/game-save/xgamesave)
+
+
