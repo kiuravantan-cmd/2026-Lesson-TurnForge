@@ -2,7 +2,23 @@
 
 初回は講師の画面を見ながら、一緒に問1のプロジェクトを作成します。
 問2以降も同じ手順で作成し、Q01〜Q10をそれぞれ別のプロジェクトとして残します。
-配布するのは問題文・問題コード・問10のCharacter.csと、手順の画像です。
+README・問題文・手順の画像は、このGitHubのページで読みます。ローカルでMarkdownを開く必要はありません。
+配布ZIPには全10問のソースコードと、問10のCharacter.csだけが入っています。
+各問題の.csの先頭にも、問題文・進め方・提出方法をコメントで記載しています。
+
+
+## 問題一覧
+
+- [問1](Questions/Q01/Problem.md)
+- [問2](Questions/Q02/Problem.md)
+- [問3](Questions/Q03/Problem.md)
+- [問4](Questions/Q04/Problem.md)
+- [問5](Questions/Q05/Problem.md)
+- [問6](Questions/Q06/Problem.md)
+- [問7](Questions/Q07/Problem.md)
+- [問8](Questions/Q08/Problem.md)
+- [問9](Questions/Q09/Problem.md)
+- [問10](Questions/Q10/Problem.md)
 
 ## 必要なもの
 
@@ -65,7 +81,7 @@ Hello, World!が表示されれば、問題コードを入れる準備は完了�
 
 ## 6. その問題のコードを入れる
 
-1. 問1ならQuestions/Q01/Problem.mdを読み、Q01.csを開きます。
+1. 上の「問題一覧」から問1を読み、展開したZIPのQuestions/Q01/Q01.csを開きます。問題文は.csの先頭でも読めます。
 2. Q01.csのコード全体をコピーします。
 3. 自分で作ったQ01プロジェクトのProgram.csを開き、内容をすべて置き換えます。既存のMainやHello Worldへ追記しません。
 4. 保存します。配布したnamespaceのCSharpPracticeは、そのまま使えます。
@@ -149,5 +165,5 @@ HpとTakeDamageを使い、Character.csの中身は変更しません。
 
 ## 文字コード
 
-配布した.csと.mdはUTF-8 BOM付きです。
+配布した.csはUTF-8 BOM付きです。READMEと問題文はGitHubで読めます。
 文字化けした表示のまま保存せず、UTF-8として開き直してください。

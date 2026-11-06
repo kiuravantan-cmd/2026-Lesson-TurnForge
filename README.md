@@ -1,4 +1,4 @@
-# Roguelite
+﻿# Roguelite
 
 # 命名規則 (Naming Conventions)
 
@@ -18,3 +18,7 @@
 | ローカル変数 | camelCase | `currentIndex`, `resultValue` | |
 | 定数 | PascalCase | `MaxHealth`, `DefaultSpeed` | |
 | 列挙型 (Enum) | PascalCase | `GameState`, `WeaponType` | |
+
+## C#コンソール演習（10問）
+
+[プロジェクト作成手順・問題一覧](Docs/CSharpPractice10/01/README.md)
