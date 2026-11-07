@@ -11,10 +11,20 @@ namespace TF.UI.Title
         /// 新しい戦闘の開始が指示されたときに通知
         /// </summary>
         event UnityAction StartRequested;
+
+        /// <summary>
+        /// 保存したバトルの再開が要求されたときに通知
+        /// </summary>
+        event UnityAction ResumeRequested;
         
         /// <summary>
         /// 開始操作を受け付けるか設定
         /// </summary>
         void SetInputEnabled(bool enabled);
+
+        /// <summary>
+        /// 再開できる保存データがあるかを表示に反映する
+        /// </summary>
+        void SetResumeAvailable(bool available);
     }
 }

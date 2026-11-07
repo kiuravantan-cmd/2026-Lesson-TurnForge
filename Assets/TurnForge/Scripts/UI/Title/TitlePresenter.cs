@@ -24,6 +24,10 @@ namespace TF.UI.Title
         /// </summary>
         private readonly Func<UniTask<bool>> _startBattleAsync;
 
+        private readonly Func<UniTask<bool>> _resumeBattleAsync;
+
+        private readonly Func<bool> _canResume;
+
         /// <summary>
         /// イベントを購読しているか
         /// </summary>
@@ -42,11 +46,17 @@ namespace TF.UI.Title
         /// <summary>
         /// タイトル表示・進行状態・戦闘開始処理を受け取る
         /// </summary>
-        public TitlePresenter (ITitleView view, GameFlowController gameFlow, Func<UniTask<bool>> startBattleAsync)
+        public TitlePresenter (ITitleView view,
+                               GameFlowController gameFlow,
+                               Func<UniTask<bool>> startBattleAsync,
+                               Func<UniTask<bool>> resumeBattleAsync,
+                               Func<bool> canResume)
         {
             _view = view;
             _gameFlow = gameFlow;
             _startBattleAsync = startBattleAsync;
+            _resumeBattleAsync = resumeBattleAsync;
+            _canResume = canResume;
         }
 
         /// <summary>
@@ -54,7 +64,8 @@ namespace TF.UI.Title
         /// </summary>
         public bool TryInitialize()
         {
-            if (_isDisposed || _gameFlow == null || _view == null || _startBattleAsync == null)
+            if (_isDisposed || _gameFlow == null || _view == null ||
+                _startBattleAsync == null || _resumeBattleAsync == null || _canResume == null)
             {
                 return false;
             }
@@ -65,6 +76,7 @@ namespace TF.UI.Title
             }
 
             _view.StartRequested += HandleStartRequested;
+            _view.ResumeRequested += HandleResumeRequested;
             _gameFlow.StateChanged += HandleStateChanged;
             _isInitialized = true;
 
@@ -77,24 +89,37 @@ namespace TF.UI.Title
         /// </summary>
         private void HandleStartRequested()
         {
-            if (_isDisposed || !_isInitialized || _isStarting || _gameFlow.CurrentState != GameState.Title)
-            {
+            HandleBattleRequested(false);
+        }
+
+        private void HandleResumeRequested()
+        {
+            HandleBattleRequested(true);
+        }
+
+        private void HandleBattleRequested(bool resumeSaveBattle)
+        {
+            if (_isDisposed || !_isInitialized || _isStarting || _gameFlow.CurrentState != GameState.Title) {
+                return;
+            }
+
+            if (resumeSaveBattle && !_canResume()) {
                 return;
             }
 
             _isStarting = true;
             RefreshInput();
-            
-            StartBattleAsync().Forget();
+
+            StartBattleAsync(resumeSaveBattle).Forget();
         }
 
         /// <summary>
         /// 戦闘開始処理の完了後、現在の状態に合わせて入力を更新
         /// </summary>
-        private async UniTaskVoid StartBattleAsync()
+        private async UniTaskVoid StartBattleAsync(bool resumeSaveBattle)
         {
             // 成功・失敗の画面遷移は、開始処理側が担当
-            await _startBattleAsync();
+            await (resumeSaveBattle ? _resumeBattleAsync() : _startBattleAsync());
 
             _isStarting = false;
 
@@ -127,6 +152,7 @@ namespace TF.UI.Title
         {
             bool enabled = !_isStarting && _gameFlow.CurrentState == GameState.Title;
             _view.SetInputEnabled(enabled);
+            _view.SetResumeAvailable(_canResume());
         }
 
         /// <summary>
@@ -145,6 +171,7 @@ namespace TF.UI.Title
             {
                 _gameFlow.StateChanged -= HandleStateChanged;
                 _view.StartRequested -= HandleStartRequested;
+                _view.ResumeRequested -= HandleResumeRequested;
                 _isInitialized = false;
             }
         }

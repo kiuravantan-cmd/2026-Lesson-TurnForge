@@ -59,7 +59,10 @@ namespace TF.Battle.Saving
                 return true;
             }
 
-            if (!_storage.TryLoad<BattleSessionSaveData>(SaveKey, out var data, out var status)) {
+            bool loaded = _storage.TryLoad<BattleSessionSaveData>(SaveKey, out var data, out var status);
+            UnityEngine.Debug.Log($"[Load_2 Storage結果] 成功={loaded} status={status}");
+
+            if (!loaded) {
                 if (status == SaveLoadStatus.Failed) {
                     return false;
                 }
@@ -70,7 +73,11 @@ namespace TF.Battle.Saving
                 }
             }
 
-            if (!IsValidData(data)) {
+            bool isValid = IsValidData(data);
+            UnityEngine.Debug.Log($"[Load_2 値の確認] 有効={isValid}" +
+                $"ターン={data?.TurnNumber} 番={data?.ActionSide}");
+
+            if (!isValid) {
                 return false;
             }
 

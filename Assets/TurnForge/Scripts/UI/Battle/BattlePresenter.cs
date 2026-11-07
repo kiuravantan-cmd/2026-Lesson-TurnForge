@@ -229,6 +229,12 @@ namespace TF.UI.Battle
             }
             else if (CanAcceptPlayerInput)
             {
+                UnityEngine.Debug.Log(
+                    $"[Save_1] 番={_model.CurrentState.ActionSide}" +
+                    $"ターン={_model.CurrentState.TurnNumber}" +
+                    $"自分HP={_model.CurrentState.FirstCombatant.Hp}" +
+                    $"相手HP={_model.CurrentState.SecondCombatant.Hp}");
+
                 PlayerTurnReady?.Invoke(_model.CurrentState);
             }
 

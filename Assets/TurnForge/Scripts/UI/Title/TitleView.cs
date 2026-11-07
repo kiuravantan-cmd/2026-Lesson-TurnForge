@@ -16,28 +16,41 @@ namespace TF.UI.Title
         [SerializeField] private Button _startButton;
 
         /// <summary>
+        /// 再開ボタン
+        /// </summary>
+        [SerializeField] private Button _resumeButton;
+
+        /// <summary>
         /// Presenterから指定された入力受付状態
         /// </summary>
         private bool _isInputEnabled = false;
+
+        /// <summary>
+        /// 再開できる保存データがあるか
+        /// </summary>
+        private bool _isResumeAvailable;
 
         /// <summary>
         /// 新しい戦闘の開始が指示されたときに通知
         /// </summary>
         public event UnityAction StartRequested;
 
+        public event UnityAction ResumeRequested;
+
         /// <summary>
         /// 画面が有効化されるときに、ボタンのクリックイベントを登録
         /// </summary>
         private void OnEnable()
         {
-            if (_startButton == null)
+            if (_startButton == null || _resumeButton == null)
             {
-                Debug.LogError("開始ボタンが設定されていません", this);
+                Debug.LogError("開始または再開ボタンが設定されていません", this);
                 return;
             }
 
             _startButton.onClick.AddListener(HandleStartClicked);
-            _startButton.interactable = _isInputEnabled;
+            _resumeButton.onClick.AddListener(HandleResumeClicked);
+            RefreshButtons();
         }
 
         /// <summary>
@@ -49,6 +62,10 @@ namespace TF.UI.Title
             {
                 _startButton.onClick.RemoveListener(HandleStartClicked);
             }
+
+            if (_resumeButton != null) {
+                _resumeButton.onClick.RemoveListener(HandleResumeClicked);
+            }
         }
 
         /// <summary>
@@ -57,10 +74,23 @@ namespace TF.UI.Title
         public void SetInputEnabled(bool isEnabled)
         {
             _isInputEnabled = isEnabled;
+            RefreshButtons();
+        }
 
-            if (_startButton != null)
-            {
-                _startButton.interactable = isEnabled;
+        public void SetResumeAvailable(bool available)
+        {
+            _isResumeAvailable = available;
+            RefreshButtons();
+        }
+
+        private void RefreshButtons()
+        {
+            if (_startButton != null) {
+                _startButton.interactable = _isInputEnabled;
+            }
+
+            if (_resumeButton != null) {
+                _resumeButton.interactable = _isInputEnabled && _isResumeAvailable;
             }
         }
 
@@ -75,6 +105,17 @@ namespace TF.UI.Title
             }
 
             StartRequested?.Invoke();
+        }
+
+        private void HandleResumeClicked()
+        {
+            if (!isActiveAndEnabled || !_isInputEnabled || !_isResumeAvailable ||
+                _resumeButton == null || !_resumeButton.IsInteractable())
+            {
+                return;
+            }
+
+            ResumeRequested?.Invoke();
         }
     }
 }

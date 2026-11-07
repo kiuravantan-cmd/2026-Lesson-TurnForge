@@ -95,6 +95,8 @@ namespace TF.Infrastructure.Saving
 
                 string filePath = GetFilePath(key);
 
+                Debug.Log($"[保存先] path={filePath} key={key} JSON={json}");
+
                 tmpPath = $"{filePath}.{Guid.NewGuid().ToString("N")}.tmp";
 
                 File.WriteAllText(tmpPath, json);
@@ -104,6 +106,7 @@ namespace TF.Infrastructure.Saving
                     File.Move(tmpPath, filePath);
                 }
 
+                Debug.Log($"[ファイル反映完了] path={filePath}");
                 return true;
             } catch (Exception exception) when (IsStorageException(exception)) {
                 Debug.LogWarning($"セーブに失敗しました。:{exception.Message}");
@@ -128,7 +131,13 @@ namespace TF.Infrastructure.Saving
 
             try {
                 string filePath = GetFilePath(key);
+
+                Debug.Log($"[Load_1 読み込み先]path={filePath} key={key}");
+
                 string json = File.ReadAllText(filePath);
+
+                Debug.Log($"[Load_1 ファイル読み取り]文字列={json.Length}");
+
                 if (string.IsNullOrEmpty(json)) {
                     return false;
                 }
